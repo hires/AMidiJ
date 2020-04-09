@@ -24,7 +24,13 @@ AMidiJ is running it will instantly show up in the Jack server.
 
 Limitations and Disclaimers:
 
-* This program 
+* Only hardware MIDI ports are used. This is a limitation (at least on Linux)
+of the Java native MIDI interface API.
+
+* This program has not been tested on Windows or macOS.
+
+* This program is written in Java. Although I am quite good at C, I like
+doing fun projects in Java. If that's not what you're looking for, oh well.
 
 License:
 
