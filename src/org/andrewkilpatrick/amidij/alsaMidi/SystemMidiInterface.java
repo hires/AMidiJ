@@ -279,13 +279,16 @@ public class SystemMidiInterface implements Receiver {
 	    // pitch bend fix
         if(message instanceof ShortMessage && (message.getStatus() & 0xf0) == 0xe0) {
             ShortMessage msg = (ShortMessage)message;
+            int bend = msg.getData2() << 7 | msg.getData1();
             try {
-                if(msg.getData2() > 0x3f) {
-                    msg.setMessage(msg.getStatus(), msg.getData1(), msg.getData2() - 0x40);
+                if(bend > 8191) {
+                    bend -= 8192;
                 }
                 else {
-                    msg.setMessage(msg.getStatus(), msg.getData1(), msg.getData2() + 0x40);
+                    bend += 8192;
                 }
+//                log.info("bend: " + bend);
+                msg.setMessage(msg.getStatus(), bend & 0x7f, (bend >> 7) & 0x7f);
             } catch (InvalidMidiDataException e) {
                 log.error(e.toString());
             }

@@ -241,7 +241,7 @@ public class AMidiJ implements JackClientListener, SystemMidiReceiveHandler {
                 for(int j = 0; j < JackMidi.getEventCount(port); j++) {
                     JackMidi.eventGet(event, port, j);
                     event.read(data);
-                    log.debug("from jack MIDI port: " + port.getName() + " - msg length: " + event.size());
+//                    log.debug("from jack MIDI port: " + port.getName() + " - msg length: " + event.size());
                     // XXX SYSEX messages are probably not supported by this way of doing things
                     switch(event.size()) {
                         case 1:
