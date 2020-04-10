@@ -324,34 +324,46 @@ public class JackClientAdapter implements JackPortConnectCallback, JackProcessCa
         String ourPortName;
         String clientName;
         String clientPortName;
+
         // is port1 our client?
         if(port1Parts[0].equals(jackClient.getName())) {
             ourPortName = port1Parts[1];
             clientName = port2Parts[0];
             clientPortName = port2Parts[1];
+            JackPatchLink newLink = new JackPatchLink(ourPortName,
+                new JackPortName(clientName, clientPortName));
+            try {
+                // add the link
+                patchStatus.addLink(newLink);
+                patchStatus.printStatus();
+                // call listener
+                if(jcl != null) {
+                    jcl.portConnected(newLink);
+                }
+            } catch (JackClientAdapterException e) {
+                log.error(e.toString());
+            }
         }
+
         // is port2 our client?
-        else if(port2Parts[0].equals(jackClient.getName())) {
+        // check this also because we could be connecting between ourself
+        if(port2Parts[0].equals(jackClient.getName())) {
             ourPortName = port2Parts[1];
             clientName = port1Parts[0];
             clientPortName = port1Parts[1];
-        }
-        // not our port
-        else {
-            return;
-        }
-        JackPatchLink newLink = new JackPatchLink(ourPortName,
+            JackPatchLink newLink = new JackPatchLink(ourPortName,
                 new JackPortName(clientName, clientPortName));
-        try {
-            // add the link
-            patchStatus.addLink(newLink);
-            patchStatus.printStatus();
-            // call listener
-            if(jcl != null) {
-                jcl.portConnected(newLink);
+            try {
+                // add the link
+                patchStatus.addLink(newLink);
+                patchStatus.printStatus();
+                // call listener
+                if(jcl != null) {
+                    jcl.portConnected(newLink);
+                }
+            } catch (JackClientAdapterException e) {
+                log.error(e.toString());
             }
-        } catch (JackClientAdapterException e) {
-            log.error(e.toString());
         }
     }
     
@@ -374,28 +386,38 @@ public class JackClientAdapter implements JackPortConnectCallback, JackProcessCa
             ourPortName = port1Parts[1];
             clientName = port2Parts[0];
             clientPortName = port2Parts[1];
+            JackPatchLink link = new JackPatchLink(ourPortName,
+                    new JackPortName(clientName, clientPortName));
+            try {
+                patchStatus.removeLink(link);
+                patchStatus.printStatus();
+                // call listener
+                if(jcl != null) {
+                    jcl.portDisconnected(link);
+                }
+            } catch (JackClientAdapterException e) {
+                log.error(e.toString());
+            }
         }
+        
         // is port2 our client?
-        else if(port2Parts[0].equals(jackClient.getName())) {
+        // check this also because we could be connecting between ourself
+        if(port2Parts[0].equals(jackClient.getName())) {
             ourPortName = port2Parts[1];
             clientName = port1Parts[0];
             clientPortName = port1Parts[1];
-        }
-        // not our port
-        else {
-            return;
-        }
-        JackPatchLink link = new JackPatchLink(ourPortName,
-                new JackPortName(clientName, clientPortName));
-        try {
-            patchStatus.removeLink(link);
-            patchStatus.printStatus();
-            // call listener
-            if(jcl != null) {
-                jcl.portDisconnected(link);
+            JackPatchLink link = new JackPatchLink(ourPortName,
+                    new JackPortName(clientName, clientPortName));
+            try {
+                patchStatus.removeLink(link);
+                patchStatus.printStatus();
+                // call listener
+                if(jcl != null) {
+                    jcl.portDisconnected(link);
+                }
+            } catch (JackClientAdapterException e) {
+                log.error(e.toString());
             }
-        } catch (JackClientAdapterException e) {
-            log.error(e.toString());
         }
     }
 

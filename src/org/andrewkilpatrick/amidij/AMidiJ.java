@@ -110,11 +110,10 @@ public class AMidiJ implements JackClientListener, SystemMidiReceiveHandler {
     @Override
     public void portConnected(JackPatchLink link) {
         String rawPortName = StringUtils.removeJackPortPrefix(link.getOurPortName());
-        log.info("Jack port connected: " + link.getOurPortName() + " - raw name: " + rawPortName);
         
         // connected input (from jack)
         if(jackClient.isPortNameMIDIInPort(link.getOurPortName())) {
-            log.debug("in port (from jack)");
+            log.info("in from Jack port connected: " + link.getOurPortName() + " - raw name: " + rawPortName);
             try {
                 SystemMidiInterface midi;
                 // port is already open
@@ -136,7 +135,7 @@ public class AMidiJ implements JackClientListener, SystemMidiReceiveHandler {
         }
         // connected output (to jack)
         else if(jackClient.isPortNameMIDIOutPort(link.getOurPortName())) {
-            log.debug("out port (to jack)");
+            log.info("out to Jack port connected: " + link.getOurPortName() + " - raw name: " + rawPortName);
             try {
                 SystemMidiInterface midi;
                 // port is already open
@@ -221,7 +220,7 @@ public class AMidiJ implements JackClientListener, SystemMidiReceiveHandler {
                 MidiMessage msg = queue.removeQueue();
                 int time = 0;
                 try {
-                    log.info("msg length: " + msg.getLength());
+                    log.debug("to Jack MIDI port: " + port.getName() + " - msg length: " + msg.getLength());
                     JackMidi.eventWrite(port, time, msg.getMessage(), msg.getLength());
                 } catch (JackException e) {
                     log.error(e.toString());
@@ -242,6 +241,7 @@ public class AMidiJ implements JackClientListener, SystemMidiReceiveHandler {
                 for(int j = 0; j < JackMidi.getEventCount(port); j++) {
                     JackMidi.eventGet(event, port, j);
                     event.read(data);
+                    log.debug("from jack MIDI port: " + port.getName() + " - msg length: " + event.size());
                     // XXX SYSEX messages are probably not supported by this way of doing things
                     switch(event.size()) {
                         case 1:
@@ -375,7 +375,7 @@ public class AMidiJ implements JackClientListener, SystemMidiReceiveHandler {
 
     @Override
     public void messageReceived(MidiMessage msg, SystemMidiInterface source) {
-        log.info("got message from sys MIDI input: " + MidiMessageUtils.messageToString(msg));
+//        log.debug("got message from sys MIDI input: " + MidiMessageUtils.messageToString(msg));
         SysToJackQueue queue = sysToJackQueues.get(source.getInputDeviceNameOpened());
         if(queue != null) {
             queue.addQueue(msg);
