@@ -282,6 +282,22 @@ public class JackClientAdapter implements JackPortConnectCallback, JackProcessCa
         }
     }
     
+    /**
+     * Gets a list of the ports to which our port is connected.
+     * 
+     * @param ourPortName our port name
+     * @return a list of ports to which ours is connectedd or a blank array on error
+     */
+    public String[] getConnectedPorts(String ourPortName) {
+        try {
+            return jack.getAllConnections(jackClient,
+                jackClient.getName() + ":" + ourPortName);
+        } catch (JackException e) {
+            log.error(e.toString());
+        }
+        return new String[0];
+    }
+    
     @Override
     public void portRegistered(JackClient client, String portFullName) {
         log.debug("port registered: " + portFullName);

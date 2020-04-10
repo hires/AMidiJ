@@ -31,6 +31,7 @@ import javax.sound.midi.MidiMessage;
 import javax.sound.midi.MidiSystem;
 import javax.sound.midi.MidiUnavailableException;
 import javax.sound.midi.Receiver;
+import javax.sound.midi.ShortMessage;
 import javax.sound.midi.Transmitter;
 
 import org.apache.logging.log4j.LogManager;
@@ -43,7 +44,7 @@ import org.apache.logging.log4j.Logger;
  *
  */
 public class SystemMidiInterface implements Receiver {
-	Logger logger;
+	Logger log;
 	// input
 	String inputDeviceName = "";
     MidiDevice inputDevice = null;
@@ -60,7 +61,7 @@ public class SystemMidiInterface implements Receiver {
 	 * @throws MidiUnavailableException if there is an error getting MIDI port info
 	 */
 	public SystemMidiInterface() throws MidiUnavailableException {
-		logger = LogManager.getLogger(this.getClass());
+		log = LogManager.getLogger(this.getClass());
 		Thread t = new Thread() {
 			public void run() {
 				closeMIDIPorts();
@@ -154,7 +155,7 @@ public class SystemMidiInterface implements Receiver {
 		}
 		
 		if(inputDevNum >= 0) {
-			logger.info("opening MIDI in port: "
+			log.info("opening MIDI in port: "
 					+ midiDevices[inputDevNum].getName());
 			inputDevice = MidiSystem.getMidiDevice(midiDevices[inputDevNum]);
 			inputDevice.open();
@@ -187,7 +188,7 @@ public class SystemMidiInterface implements Receiver {
         }
 
         if(outputDevNum >= 0) {
-            logger.info("opening MIDI out port: "
+            log.info("opening MIDI out port: "
                     + midiDevices[outputDevNum].getName());
             outputDevice = MidiSystem.getMidiDevice(midiDevices[outputDevNum]);
             outputDevice.open();
@@ -200,23 +201,27 @@ public class SystemMidiInterface implements Receiver {
 	 * Closes the MIDI ports.
 	 */
 	public void closeMIDIPorts() {
-		logger.info("closing MIDI port...");
+		log.info("closing MIDI port...");
 		if(in != null) {
 			in.close();
 			in = null;
 		}
+		/*
 		if(inputDevice != null) {
 			inputDevice.close();
 			inputDevice = null;
 		}
+		*/
 		if(out != null) {
 			out.close();
 			out = null;
 		}
+		/*
 		if(outputDevice != null) {
 			outputDevice.close();
 			outputDevice = null;
 		}
+		*/
 	}
 	
 	/**
@@ -255,7 +260,7 @@ public class SystemMidiInterface implements Receiver {
 	 */
 	@Override
 	public void close() {
-		logger.info("MIDI output closing.");
+		log.info("MIDI output closing.");
 		if (out != null) {
 			out.close();
 			out = null;
@@ -271,6 +276,22 @@ public class SystemMidiInterface implements Receiver {
 	 */
 	@Override
 	public void send(MidiMessage message, long timeStamp) {
+	    // pitch bend fix
+        if(message instanceof ShortMessage && (message.getStatus() & 0xf0) == 0xe0) {
+            ShortMessage msg = (ShortMessage)message;
+            try {
+                if(msg.getData2() > 0x3f) {
+                    msg.setMessage(msg.getStatus(), msg.getData1(), msg.getData2() - 0x40);
+                }
+                else {
+                    msg.setMessage(msg.getStatus(), msg.getData1(), msg.getData2() + 0x40);
+                }
+            } catch (InvalidMidiDataException e) {
+                log.error(e.toString());
+            }
+            mrh.messageReceived(msg, this);
+            return;
+        }
 		mrh.messageReceived(message, this);
 	}
 }

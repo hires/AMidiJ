@@ -38,6 +38,7 @@ import org.andrewkilpatrick.amidij.jack.JackClientAdapter;
 import org.andrewkilpatrick.amidij.jack.JackClientAdapterException;
 import org.andrewkilpatrick.amidij.jack.JackClientListener;
 import org.andrewkilpatrick.amidij.jack.JackPatchLink;
+import org.andrewkilpatrick.amidij.util.MidiMessageUtils;
 import org.andrewkilpatrick.amidij.util.StringUtils;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
@@ -56,7 +57,7 @@ public class AMidiJ implements JackClientListener, SystemMidiReceiveHandler {
     HashMap<String, SystemMidiInterface> sysOpenInputs;  // raw port name, MIDI handler
     HashMap<String, SystemMidiInterface> sysOpenOutputs;  // raw port name, MIDI handler
     // routing
-    HashMap<String, SysToJackQueue> sysToJackMap;  // raw port name, queue
+    HashMap<String, SysToJackQueue> sysToJackQueues;  // system port name, SysToJackQueue
     HashMap<String, JackToSys> jackToSysMap;  // jack port name, JackToSys instance
     
     /**
@@ -76,7 +77,7 @@ public class AMidiJ implements JackClientListener, SystemMidiReceiveHandler {
             sysAvailableOutputs = new HashMap<>();
             sysOpenInputs = new HashMap<>();
             sysOpenOutputs = new HashMap<>();
-            sysToJackMap = new HashMap<>();
+            sysToJackQueues = new HashMap<>();
             jackToSysMap = new HashMap<>();
         } catch (JackClientAdapterException e) {
             log.error(e.toString());
@@ -103,31 +104,53 @@ public class AMidiJ implements JackClientListener, SystemMidiReceiveHandler {
      */
     @Override
     public void availablePortsChanged() {
-//        log.debug("available ports changed");
+        log.debug("available ports changed");
     }
 
     @Override
     public void portConnected(JackPatchLink link) {
         String rawPortName = StringUtils.removeJackPortPrefix(link.getOurPortName());
         log.info("Jack port connected: " + link.getOurPortName() + " - raw name: " + rawPortName);
+        
+        // connected input (from jack)
         if(jackClient.isPortNameMIDIInPort(link.getOurPortName())) {
             log.debug("in port (from jack)");
             try {
-                SystemMidiInterface midi = new SystemMidiInterface();
-                midi.openMIDIOutputPort(rawPortName);
-                sysOpenOutputs.put(rawPortName, midi);
-                jackToSysMap.put(rawPortName, new JackToSys(midi, sysAvailableOutputs.get(rawPortName)));
+                SystemMidiInterface midi;
+                // port is already open
+                if(sysOpenOutputs.containsKey(rawPortName)) {
+                    log.info("system port already opened: " + rawPortName);
+                    midi = sysOpenInputs.get(rawPortName);
+                }
+                // first time using this port
+                else {
+                    midi = new SystemMidiInterface();
+                    midi.openMIDIOutputPort(rawPortName);
+                    sysOpenOutputs.put(rawPortName, midi);
+                }
+                jackToSysMap.put(rawPortName, new JackToSys(midi,
+                    sysAvailableOutputs.get(rawPortName)));
             } catch (MidiUnavailableException e) {
                 log.error(e.toString());
             }
         }
+        // connected output (to jack)
         else if(jackClient.isPortNameMIDIOutPort(link.getOurPortName())) {
             log.debug("out port (to jack)");
             try {
-                SystemMidiInterface midi = new SystemMidiInterface();
-                midi.openMIDIInputPort(rawPortName, this);
-                sysOpenInputs.put(rawPortName, midi);
-                sysToJackMap.put(rawPortName, new SysToJackQueue(rawPortName,
+                SystemMidiInterface midi;
+                // port is already open
+                if(sysOpenInputs.containsKey(rawPortName)) {
+                    log.info("system port already opened: " + rawPortName);
+                    midi = sysOpenInputs.get(rawPortName);
+                }
+                // first time using this port
+                else {
+                    midi = new SystemMidiInterface();
+                    midi.openMIDIInputPort(rawPortName, this);
+                    sysOpenInputs.put(rawPortName, midi);
+                }
+                sysToJackQueues.put(rawPortName, new SysToJackQueue(rawPortName,
                     sysAvailableInputs.get(rawPortName)));
             } catch (MidiUnavailableException e) {
                 log.error(e.toString());
@@ -142,25 +165,40 @@ public class AMidiJ implements JackClientListener, SystemMidiReceiveHandler {
     public void portDisconnected(JackPatchLink link) {
         String rawPortName = StringUtils.removeJackPortPrefix(link.getOurPortName());
         log.info("Jack port disconnected: " + link.getOurPortName() + " - raw name: " + rawPortName);
+        
+        // disconnect input (from jack)
         if(jackClient.isPortNameMIDIInPort(link.getOurPortName())) {
             log.debug("in port (from jack)");
             if(!sysOpenOutputs.containsKey(rawPortName)) {
                 log.error("system output port is not open: " + rawPortName);
                 return;
             }
-            SystemMidiInterface midi = sysOpenOutputs.get(rawPortName);
-            midi.closeMIDIPorts();
-            sysOpenOutputs.remove(rawPortName);
+            // check to see if this is the only port connected
+            String connectedPorts[] = jackClient.getConnectedPorts(link.getOurPortName());
+            if(connectedPorts.length == 0) {
+                log.info("no other ports are connected to this port - closing");
+                SystemMidiInterface midi = sysOpenOutputs.get(rawPortName);
+                midi.closeMIDIPorts();
+                sysOpenOutputs.remove(rawPortName);
+                jackToSysMap.remove(rawPortName);
+            }
         }
+        // disconnect output (to jack)
         else if(jackClient.isPortNameMIDIOutPort(link.getOurPortName())) {
             log.debug("out port (to jack)");
             if(!sysOpenInputs.containsKey(rawPortName)) {
                 log.error("system input port is not open: " + rawPortName);
                 return;
             }
-            SystemMidiInterface midi = sysOpenInputs.get(rawPortName);
-            midi.closeMIDIPorts();
-            sysOpenInputs.remove(rawPortName);
+            // check to see if this is the only port connected
+            String connectedPorts[] = jackClient.getConnectedPorts(link.getOurPortName());
+            if(connectedPorts.length == 0) {
+                log.info("no other ports are connected to this port - closing");
+                SystemMidiInterface midi = sysOpenInputs.get(rawPortName);
+                midi.closeMIDIPorts();
+                sysOpenInputs.remove(rawPortName);
+                sysToJackQueues.remove(rawPortName);
+            }
         }
         else {
             log.error("port not found: " + link.getOurPortName());
@@ -170,7 +208,7 @@ public class AMidiJ implements JackClientListener, SystemMidiReceiveHandler {
     @Override
     public boolean process(JackClient client, int nframes) {
         // process MIDI inputs (to Jack)
-        Iterator<SysToJackQueue> iter = sysToJackMap.values().iterator();
+        Iterator<SysToJackQueue> iter = sysToJackQueues.values().iterator();
         while(iter.hasNext()) {
             SysToJackQueue queue = iter.next();
             JackPort port = queue.getJackPort();
@@ -183,6 +221,7 @@ public class AMidiJ implements JackClientListener, SystemMidiReceiveHandler {
                 MidiMessage msg = queue.removeQueue();
                 int time = 0;
                 try {
+                    log.info("msg length: " + msg.getLength());
                     JackMidi.eventWrite(port, time, msg.getMessage(), msg.getLength());
                 } catch (JackException e) {
                     log.error(e.toString());
@@ -249,8 +288,10 @@ public class AMidiJ implements JackClientListener, SystemMidiReceiveHandler {
             if(name.equals("Real Time Sequencer")) {
                 continue;
             }
+//            log.info("MIDI IN: " + name);
             // new port appeared
             if(!sysAvailableInputs.containsKey(name)) {
+                log.info("new MIDI IN port appeared: " + name);
                 try {
                     String portName = StringUtils.makeOutputName(name);
                     JackPort port = jackClient.registerMIDIOutPort(portName);
@@ -272,6 +313,7 @@ public class AMidiJ implements JackClientListener, SystemMidiReceiveHandler {
             String name = iter.next();
             // port disappeared
             if(!inSet.contains(name)) {
+                log.info("MIDI IN port disappeared: " + name);
                 try {
                     String portName = StringUtils.makeOutputName(name);
                     jackClient.unregisterMIDIOutPort(portName);
@@ -293,8 +335,10 @@ public class AMidiJ implements JackClientListener, SystemMidiReceiveHandler {
             if(name.equals("Gervill")) {
                 continue;
             }
+//            log.info("MIDI OUT: " + name);
             // new port appeared
             if(!sysAvailableOutputs.containsKey(name)) {
+                log.info("new MIDI OUT port appeared: " + name);
                 try {
                     String portName = StringUtils.makeInputName(name);
                     JackPort port = jackClient.registerMIDIInPort(portName);
@@ -316,6 +360,7 @@ public class AMidiJ implements JackClientListener, SystemMidiReceiveHandler {
             String name = iter.next();
             // port disappeared
             if(!outSet.contains(name)) {
+                log.info("MIDI OUT port disappeared: " + name);
                 try {
                     String portName = StringUtils.makeInputName(name);
                     jackClient.unregisterMIDIInPort(portName);
@@ -330,12 +375,10 @@ public class AMidiJ implements JackClientListener, SystemMidiReceiveHandler {
 
     @Override
     public void messageReceived(MidiMessage msg, SystemMidiInterface source) {
-//        log.debug("got message from sys MIDI input - len: " + msg.getLength());
-        SysToJackQueue queue = sysToJackMap.get(source.getInputDeviceNameOpened());
-        if(queue == null) {
-            log.error("port not found: " + source.getInputDeviceNameOpened());
-            return;
+        log.info("got message from sys MIDI input: " + MidiMessageUtils.messageToString(msg));
+        SysToJackQueue queue = sysToJackQueues.get(source.getInputDeviceNameOpened());
+        if(queue != null) {
+            queue.addQueue(msg);
         }
-        queue.addQueue(msg);
     }
 }

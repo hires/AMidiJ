@@ -63,5 +63,4 @@ public class StringUtils {
         }
         return jackPortName;
     }
-    
 }
