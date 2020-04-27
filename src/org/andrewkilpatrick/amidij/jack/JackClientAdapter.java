@@ -48,8 +48,8 @@ public class JackClientAdapter implements JackPortConnectCallback, JackProcessCa
     JackClient jackClient;
     int samplerate;
     int bufferSize;
-    int bufferTimeMicros;
-    int frameTimeMicros;
+    double bufferTime;
+    double frameTime;
     Object lock = new Object();
     HashSet<JackPortName> availableMidiInPorts;  // a list of MIDI in ports we might care about
     HashSet<JackPortName> availableMidiOutPorts;  // a list of MIDI out ports we might care about
@@ -137,21 +137,21 @@ public class JackClientAdapter implements JackPortConnectCallback, JackProcessCa
     }
     
     /**
-     * Gets the buffer time in microseconds.
+     * Gets the buffer time
      * 
-     * @return the buffer time in microseconds
+     * @return the buffer time
      */
-    public int getBufferTimeMicros() {
-        return bufferTimeMicros;
+    public double getBufferTime() {
+        return bufferTime;
     }
     
     /**
-     * Gets the frame time in micros. Might be rounded off.
+     * Gets the frame time.
      * 
-     * @return the frame time in micros
+     * @return the frame time
      */
-    public long getFrameTimeMicros() {
-        return frameTimeMicros;
+    public double getFrameTime() {
+        return frameTime;
     }
     
     /**
@@ -495,8 +495,8 @@ public class JackClientAdapter implements JackPortConnectCallback, JackProcessCa
     public void buffersizeChanged(JackClient client, int buffersize) {
         log.info("buffer size: " + buffersize);
         this.bufferSize = buffersize;
-        bufferTimeMicros = (int)(1.0 / (double)samplerate * (double)this.bufferSize * 1000000.0);
-        frameTimeMicros = bufferTimeMicros / this.bufferSize;
+        bufferTime = 1.0 / (double)samplerate * (double)this.bufferSize;
+        frameTime = bufferTime / (double)this.bufferSize;
     }
     
     @Override

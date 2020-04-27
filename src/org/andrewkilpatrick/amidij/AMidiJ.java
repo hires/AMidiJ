@@ -208,7 +208,8 @@ public class AMidiJ implements JackClientListener, SystemMidiReceiveHandler {
     @Override
     public boolean process(JackClient client, int nframes) {
         lastJackFrameTime = jackClient.getLastFrameTime();
-        int bufferTimeMicros = jackClient.getBufferTimeMicros();
+        int bufferTimeMicros = (int)(jackClient.getBufferTime() * 1000000.0);
+        double frameTime = jackClient.getFrameTime();
         
         // process MIDI inputs (to Jack)
         Iterator<SysToJackQueue> iter = sysToJackQueues.values().iterator();
@@ -225,10 +226,13 @@ public class AMidiJ implements JackClientListener, SystemMidiReceiveHandler {
             while(queue.messageAvailable()) {
                 TimedMessage tMsg = queue.removeQueue();
                 MidiMessage msg = tMsg.getMessage();
+                long frameOffset = jackClient.getCurrentFrame() - lastJackFrameTime;  // frames
                 int offset = bufferTimeMicros - (int)(sysPortTime - tMsg.getTimestamp());
+                offset = (int)((double)offset / (double)bufferTimeMicros * (double)(nframes - 1));  // frames
+                offset -= frameOffset;  // compensate for the actual time we sample the system port
+                // clamp to valid range
                 if(offset < 0) offset = 0;
                 if(offset >= bufferTimeMicros) offset = bufferTimeMicros;
-                offset = (int)((double)offset / (double)bufferTimeMicros * (double)(nframes - 1));
                 try {
 //                    log.debug("to Jack MIDI port: " + port.getName() + " - msg length: " + msg.getLength());
                     JackMidi.eventWrite(jackPort, offset, msg.getMessage(), msg.getLength());
@@ -240,7 +244,6 @@ public class AMidiJ implements JackClientListener, SystemMidiReceiveHandler {
         }
         
         // process MIDI outputs (from Jack)
-        long frameTimeMicros = jackClient.getFrameTimeMicros();
         Iterator<JackToSys> iter2 = jackToSysMap.values().iterator();
         while(iter2.hasNext()) {
             JackToSys j2s = iter2.next();
@@ -255,7 +258,7 @@ public class AMidiJ implements JackClientListener, SystemMidiReceiveHandler {
                 for(int j = 0; j < JackMidi.getEventCount(port); j++) {
                     JackMidi.eventGet(event, port, j);
                     event.read(data);
-                    long timestamp = sysPortTime + (event.time() * frameTimeMicros);
+                    long timestamp = sysPortTime + (long)((double)event.time() * frameTime);
 //                    log.debug("from jack MIDI port: " + port.getName() + " - offset: " + timestamp + " - msg length: " + event.size());
                     // XXX SYSEX messages are probably not supported by this way of doing things
                     switch(event.size()) {
