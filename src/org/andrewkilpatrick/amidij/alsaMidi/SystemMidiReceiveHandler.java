@@ -30,8 +30,9 @@ public interface SystemMidiReceiveHandler {
      * Handles a message received..
      * 
      * @param msg the message
+     * @param timestamp the message timestamp
      * @param source the MIDI handler that was the source
      */
-	public void messageReceived(MidiMessage msg, SystemMidiInterface source);
+	public void messageReceived(MidiMessage msg, long timestamp, SystemMidiInterface source);
 	
 }

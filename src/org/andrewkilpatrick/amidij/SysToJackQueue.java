@@ -24,23 +24,22 @@ package org.andrewkilpatrick.amidij;
 
 import java.util.concurrent.ConcurrentLinkedQueue;
 
-import javax.sound.midi.MidiMessage;
-
+import org.andrewkilpatrick.amidij.alsaMidi.SystemMidiInterface;
 import org.jaudiolibs.jnajack.JackPort;
 
 public class SysToJackQueue {
-    String sysPortName;  // system port name
+    SystemMidiInterface sysPort;  // from system
     JackPort jackPort;  // to jack
-    ConcurrentLinkedQueue<MidiMessage> messageQueue;
+    ConcurrentLinkedQueue<TimedMessage> messageQueue;
     
     /**
      * Creates a SysToJack queue.
      * 
-     * @param sysPortName the system port name
+     * @param sysPort the system port
      * @param jackPort the jack port to send to
      */
-    public SysToJackQueue(String sysPortName, JackPort jackPort) {
-        this.sysPortName = sysPortName;
+    public SysToJackQueue(SystemMidiInterface sysPort, JackPort jackPort) {
+        this.sysPort = sysPort;
         this.jackPort = jackPort;
         messageQueue = new ConcurrentLinkedQueue<>();
     }
@@ -50,7 +49,7 @@ public class SysToJackQueue {
      * 
      * @param msg the message to add
      */
-    public void addQueue(MidiMessage msg) {
+    public void addQueue(TimedMessage msg) {
         messageQueue.add(msg);
     }
     
@@ -59,7 +58,7 @@ public class SysToJackQueue {
      * 
      * @return the message removed
      */
-    public MidiMessage removeQueue() {
+    public TimedMessage removeQueue() {
         return messageQueue.remove();
     }
 
@@ -76,12 +75,12 @@ public class SysToJackQueue {
     }
     
     /**
-     * Gets the sys port name.
+     * Gets the sys port.
      * 
-     * @return the sys port name
+     * @return the sys port
      */
-    public String getSysPortName() {
-        return sysPortName;
+    public SystemMidiInterface getSysPort() {
+        return sysPort;
     }
     
     /**

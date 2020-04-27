@@ -206,22 +206,10 @@ public class SystemMidiInterface implements Receiver {
 			in.close();
 			in = null;
 		}
-		/*
-		if(inputDevice != null) {
-			inputDevice.close();
-			inputDevice = null;
-		}
-		*/
 		if(out != null) {
 			out.close();
 			out = null;
 		}
-		/*
-		if(outputDevice != null) {
-			outputDevice.close();
-			outputDevice = null;
-		}
-		*/
 	}
 	
 	/**
@@ -243,6 +231,30 @@ public class SystemMidiInterface implements Receiver {
 	}
 
 	/**
+	 * Gets the input device position in microseconds
+	 * 
+	 * @return the position in microseconds
+	 */
+	public long getInputDevicePosition() {
+	    if(in == null) {
+	        return -1;
+	    }
+	    return inputDevice.getMicrosecondPosition();
+	}
+	
+	/**
+	 * Gets the output device position in microseconds.
+	 * 
+	 * @return the position in microseconds
+	 */
+	public long getOutputDevicePosition() {
+	    if(out == null) {
+	        return -1;
+	    }
+	    return outputDevice.getMicrosecondPosition();
+	}
+	
+	/**
 	 * Sends a MIDI message to the output port.
 	 * 
 	 * @param msg the message to send
@@ -254,6 +266,20 @@ public class SystemMidiInterface implements Receiver {
 		}
 		out.send(msg, -1);
 	}
+
+   /**
+     * Sends a MIDI message to the output port.
+     * 
+     * @param msg the message to send
+     * @param timestamp the timestamp
+     * @throws InvalidMidiDataException if there is an error sending the message
+     */
+    public void sendMessage(MidiMessage msg, long timestamp) throws InvalidMidiDataException {
+        if(out == null) {
+            throw new InvalidMidiDataException("output port is not enabled");
+        }
+        out.send(msg, timestamp);
+    }
 
 	/**
 	 * Event handler for messages received by the MIDI port.
@@ -275,7 +301,7 @@ public class SystemMidiInterface implements Receiver {
 	 * This handles callbacks from received message.
 	 */
 	@Override
-	public void send(MidiMessage message, long timeStamp) {
+	public void send(MidiMessage message, long timestamp) {
 	    // pitch bend fix
         if(message instanceof ShortMessage && (message.getStatus() & 0xf0) == 0xe0) {
             ShortMessage msg = (ShortMessage)message;
@@ -292,9 +318,9 @@ public class SystemMidiInterface implements Receiver {
             } catch (InvalidMidiDataException e) {
                 log.error(e.toString());
             }
-            mrh.messageReceived(msg, this);
+            mrh.messageReceived(msg, timestamp, this);
             return;
         }
-		mrh.messageReceived(message, this);
+		mrh.messageReceived(message, timestamp, this);
 	}
 }

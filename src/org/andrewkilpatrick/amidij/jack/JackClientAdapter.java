@@ -30,6 +30,7 @@ import java.util.Iterator;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 import org.jaudiolibs.jnajack.Jack;
+import org.jaudiolibs.jnajack.JackBufferSizeCallback;
 import org.jaudiolibs.jnajack.JackClient;
 import org.jaudiolibs.jnajack.JackException;
 import org.jaudiolibs.jnajack.JackOptions;
@@ -41,10 +42,14 @@ import org.jaudiolibs.jnajack.JackPortType;
 import org.jaudiolibs.jnajack.JackProcessCallback;
 import org.jaudiolibs.jnajack.JackStatus;
 
-public class JackClientAdapter implements JackPortConnectCallback, JackProcessCallback, JackPortRegistrationCallback {
+public class JackClientAdapter implements JackPortConnectCallback, JackProcessCallback, JackPortRegistrationCallback, JackBufferSizeCallback {
     Logger log;
     Jack jack;
     JackClient jackClient;
+    int samplerate;
+    int bufferSize;
+    int bufferTimeMicros;
+    int frameTimeMicros;
     Object lock = new Object();
     HashSet<JackPortName> availableMidiInPorts;  // a list of MIDI in ports we might care about
     HashSet<JackPortName> availableMidiOutPorts;  // a list of MIDI out ports we might care about
@@ -84,8 +89,11 @@ public class JackClientAdapter implements JackPortConnectCallback, JackProcessCa
             jackClient.setProcessCallback(this);
             jackClient.setPortConnectCallback(this);
             jackClient.setPortRegistrationCallback(this);
+            jackClient.setBuffersizeCallback(this);
             // start client
             jackClient.activate();
+            samplerate = jackClient.getSampleRate();
+            buffersizeChanged(jackClient, jackClient.getBufferSize());
             log.debug("client name: " + jackClient.getName());
         } catch (JackException e) {
             throw new JackClientAdapterException(e.toString());
@@ -108,6 +116,68 @@ public class JackClientAdapter implements JackPortConnectCallback, JackProcessCa
      */
     public void registerJackClientListener(JackClientListener listener) {
         jcl = listener;
+    }
+    
+    /**
+     * Gets the samplerate.
+     * 
+     * @return the samplerate
+     */
+    public int getSamplerate() {
+        return samplerate;
+    }
+    
+    /**
+     * Gets the buffer size.
+     * 
+     * @return the buffer size
+     */
+    public int getBufferSize() {
+        return bufferSize;
+    }
+    
+    /**
+     * Gets the buffer time in microseconds.
+     * 
+     * @return the buffer time in microseconds
+     */
+    public int getBufferTimeMicros() {
+        return bufferTimeMicros;
+    }
+    
+    /**
+     * Gets the frame time in micros. Might be rounded off.
+     * 
+     * @return the frame time in micros
+     */
+    public long getFrameTimeMicros() {
+        return frameTimeMicros;
+    }
+    
+    /**
+     * Gets the last frame time.
+     * 
+     * @return the last frame time in microseconds or -1 on error
+     */
+    public long getLastFrameTime() {
+        try {
+            return jackClient.getLastFrameTime();
+        } catch (JackException e) {
+            return -1;
+        }
+    }
+
+    /**
+     * Gets the current frame within the loop. Used to offset stuff.
+     * 
+     * @return the current frame estimate or -1 on error
+     */
+    public long getCurrentFrame() {
+        try {
+            return jackClient.getFrameTime();
+        } catch (JackException e) {
+            return -1;
+        }
     }
     
     /**
@@ -422,10 +492,19 @@ public class JackClientAdapter implements JackPortConnectCallback, JackProcessCa
     }
 
     @Override
+    public void buffersizeChanged(JackClient client, int buffersize) {
+        log.info("buffer size: " + buffersize);
+        this.bufferSize = buffersize;
+        bufferTimeMicros = (int)(1.0 / (double)samplerate * (double)this.bufferSize * 1000000.0);
+        frameTimeMicros = bufferTimeMicros / this.bufferSize;
+    }
+    
+    @Override
     public boolean process(JackClient client, int nframes) {
         if(jcl != null) {
             return jcl.process(client, nframes);
         }
         return true;
     }
+
 }
