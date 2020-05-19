@@ -48,8 +48,8 @@ public class JackClientAdapter implements JackPortConnectCallback, JackProcessCa
     JackClient jackClient;
     int samplerate;
     int bufferSize;
-    double bufferTime;
-    double frameTime;
+    double bufferLengthSeconds;
+    double frameLengthSeconds;
     Object lock = new Object();
     HashSet<JackPortName> availableMidiInPorts;  // a list of MIDI in ports we might care about
     HashSet<JackPortName> availableMidiOutPorts;  // a list of MIDI out ports we might care about
@@ -137,29 +137,29 @@ public class JackClientAdapter implements JackPortConnectCallback, JackProcessCa
     }
     
     /**
-     * Gets the buffer time
+     * Gets the buffer length in seconds.
      * 
-     * @return the buffer time
+     * @return the buffer length in seconds
      */
-    public double getBufferTime() {
-        return bufferTime;
+    public double getBufferLengthSeconds() {
+        return bufferLengthSeconds;
     }
     
     /**
-     * Gets the frame time.
+     * Gets the frame length in seconds.
      * 
-     * @return the frame time
+     * @return the frame length in seconds
      */
-    public double getFrameTime() {
-        return frameTime;
+    public double getFrameLengthSeconds() {
+        return frameLengthSeconds;
     }
     
     /**
-     * Gets the last frame time.
+     * Gets the last frame count.
      * 
-     * @return the last frame time in microseconds or -1 on error
+     * @return the last frame count in frames
      */
-    public long getLastFrameTime() {
+    public long getLastFrameCount() {
         try {
             return jackClient.getLastFrameTime();
         } catch (JackException e) {
@@ -172,7 +172,7 @@ public class JackClientAdapter implements JackPortConnectCallback, JackProcessCa
      * 
      * @return the current frame estimate or -1 on error
      */
-    public long getCurrentFrame() {
+    public long getCurrentFrameTime() {
         try {
             return jackClient.getFrameTime();
         } catch (JackException e) {
@@ -238,11 +238,15 @@ public class JackClientAdapter implements JackPortConnectCallback, JackProcessCa
      * Registers a MIDI IN port. (from Jack)
      * 
      * @param name the port name to register
+     * @param true if the port should be known as physical, false otherwise
      * @returns the JackPort that was registered
      * @throws JackException if there is an error
      */
-    public JackPort registerMIDIInPort(String name) throws JackException {
+    public JackPort registerMIDIInPort(String name, boolean physical) throws JackException {
         EnumSet<JackPortFlags> flags = EnumSet.of(JackPortFlags.JackPortIsInput);
+        if(physical) {
+            flags.add(JackPortFlags.JackPortIsPhysical);
+        }
         JackPort port = jackClient.registerPort(name, JackPortType.MIDI, flags);
         registeredInPorts.put(name, port);
         return port;
@@ -277,11 +281,15 @@ public class JackClientAdapter implements JackPortConnectCallback, JackProcessCa
      * Registers a MIDI OUT port. (to Jack)
      * 
      * @param name the port name to register
+     * @param true if the port should be known as physical, false otherwise
      * @return the JackPort that was registered
      * @throws JackException if there is an error
      */
-    public JackPort registerMIDIOutPort(String name) throws JackException {
+    public JackPort registerMIDIOutPort(String name, boolean physical) throws JackException {
         EnumSet<JackPortFlags> flags = EnumSet.of(JackPortFlags.JackPortIsOutput);
+        if(physical) {
+            flags.add(JackPortFlags.JackPortIsPhysical);
+        }
         JackPort port = jackClient.registerPort(name, JackPortType.MIDI, flags);
         registeredOutPorts.put(name, port);
         return port;
@@ -495,8 +503,8 @@ public class JackClientAdapter implements JackPortConnectCallback, JackProcessCa
     public void buffersizeChanged(JackClient client, int buffersize) {
         log.info("buffer size: " + buffersize);
         this.bufferSize = buffersize;
-        bufferTime = 1.0 / (double)samplerate * (double)this.bufferSize;
-        frameTime = bufferTime / (double)this.bufferSize;
+        bufferLengthSeconds = 1.0 / (double)samplerate * (double)this.bufferSize;
+        frameLengthSeconds = bufferLengthSeconds / (double)this.bufferSize;
     }
     
     @Override
