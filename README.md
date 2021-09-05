@@ -1,5 +1,9 @@
 # AMidiJ
 
+**Note: I am no longer maintaining this project. In general it seems better
+to use apps on Linux which can directly access MIDI devices via ALSA instead
+of relying on Jack.**
+
 AMidiJ can bridge ALSA (or other OS-native) MIDI ports with Jack to provide
 an easy interface for using native MIDI hardware from Jack applications such
 as REAPER, Carla and other Jack audio/MIDI applications.
